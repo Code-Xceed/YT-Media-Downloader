@@ -20,15 +20,22 @@ ctk.set_default_color_theme("blue")
 
 
 class SmoothScrollableFrame(ctk.CTkScrollableFrame):
+    _registered_scroll_canvases = set()
+
     def __init__(self, *args, scroll_speed_getter=None, **kwargs):
         bg = kwargs.get("fg_color", "#0a0a0a")
         if bg == "transparent": bg = "#0a0a0a"
         kwargs.setdefault("scrollbar_button_color", bg)
         kwargs.setdefault("scrollbar_button_hover_color", bg)
         super().__init__(*args, **kwargs)
+        SmoothScrollableFrame._registered_scroll_canvases.add(self._parent_canvas)
         self._wheel_residual_y = 0.0
         self._wheel_residual_x = 0.0
         self._scroll_speed_getter = scroll_speed_getter
+
+    def destroy(self):
+        SmoothScrollableFrame._registered_scroll_canvases.discard(self._parent_canvas)
+        super().destroy()
 
     def _nearest_scroll_target(self, widget):
         import tkinter as tk
@@ -36,10 +43,8 @@ class SmoothScrollableFrame(ctk.CTkScrollableFrame):
         while current:
             if isinstance(current, tk.Text):
                 return "text"
-            if isinstance(current, tk.Canvas):
-                master = getattr(current, "master", None)
-                if hasattr(master, "_parent_canvas") and getattr(master, "_parent_canvas") == current:
-                    return current
+            if isinstance(current, tk.Canvas) and current in SmoothScrollableFrame._registered_scroll_canvases:
+                return current
             current = getattr(current, "master", None)
         return None
 
