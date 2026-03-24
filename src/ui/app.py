@@ -1,4 +1,4 @@
-﻿
+
 import os
 import re
 import sys
@@ -21,13 +21,33 @@ ctk.set_default_color_theme("blue")
 
 class SmoothScrollableFrame(ctk.CTkScrollableFrame):
     def __init__(self, *args, scroll_speed_getter=None, **kwargs):
+        bg = kwargs.get("fg_color", "#0a0a0a")
+        if bg == "transparent": bg = "#0a0a0a"
+        kwargs.setdefault("scrollbar_button_color", bg)
+        kwargs.setdefault("scrollbar_button_hover_color", bg)
         super().__init__(*args, **kwargs)
         self._wheel_residual_y = 0.0
         self._wheel_residual_x = 0.0
         self._scroll_speed_getter = scroll_speed_getter
 
+    def _nearest_scroll_target(self, widget):
+        import tkinter as tk
+        current = widget
+        while current:
+            if isinstance(current, tk.Text):
+                return "text"
+            if isinstance(current, tk.Canvas):
+                master = getattr(current, "master", None)
+                if hasattr(master, "_parent_canvas") and getattr(master, "_parent_canvas") == current:
+                    return current
+            current = getattr(current, "master", None)
+        return None
+
     def _mouse_wheel_all(self, event):
-        if not self.check_if_master_is_canvas(event.widget):
+        target = self._nearest_scroll_target(event.widget)
+        if target == "text":
+            return
+        if target != self._parent_canvas:
             return
         horizontal = self._shift_pressed
         view = self._parent_canvas.xview if horizontal else self._parent_canvas.yview
@@ -62,18 +82,20 @@ class App(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("YT-MEDIA Downloader")
-        self.geometry("1180x780")
-        self.minsize(760, 560)
+        self.min_window_width = 760
+        self.min_window_height = 560
+        self.geometry(f"{self.min_window_width}x{self.min_window_height}")
+        self.minsize(self.min_window_width, self.min_window_height)
         self.palette = {
-            "bg": "#04070D",
-            "panel": "#0B121D",
-            "panel_soft": "#111B2A",
-            "panel_alt": "#070B13",
-            "line": "#223B67",
-            "text_muted": "#8EA4C8",
-            "accent": "#2D66FF",
-            "accent_hover": "#3F78FF",
-            "danger": "#C34848",
+            "bg": "#0a0a0a",
+            "panel": "#121212",
+            "panel_soft": "#1e1e1e",
+            "panel_alt": "#0f0f0f",
+            "line": "#2c2c2c",
+            "text_muted": "#888888",
+            "accent": "#d32f2f",
+            "accent_hover": "#ff5252",
+            "danger": "#ff1744",
         }
         self.configure(fg_color=self.palette["bg"])
 
@@ -88,8 +110,8 @@ class App(ctk.CTk):
             "Thumbnail": ["Best"],
         }
         self.spacing_profiles = {
-            "regular": {"outer_pad": 18, "card_pad": 16, "row_gap": 12, "small_gap": 8},
-            "compact": {"outer_pad": 12, "card_pad": 12, "row_gap": 10, "small_gap": 6},
+            "regular": {"outer_pad": 22, "card_pad": 18, "row_gap": 14, "small_gap": 8},
+            "compact": {"outer_pad": 14, "card_pad": 12, "row_gap": 10, "small_gap": 6},
         }
         self.font_profiles = {
             "regular": {
@@ -137,7 +159,6 @@ class App(ctk.CTk):
         self.default_output_dir = pref_dir if pref_dir and os.path.isdir(pref_dir) else self.downloads_dir
         self._font_scale = float(self.preferences.get("font_scale", 1.0))
         self._scroll_speed = float(self.preferences.get("scroll_speed", 1.0))
-        self._remember_window_size = bool(self.preferences.get("remember_window_size", True))
         self.history_entries = self.storage.load_history()
         self.history_entries = self.history_entries[: int(self.preferences.get("history_limit", 30))]
         self.dl = Downloader(on_progress=self._on_progress, on_log=self._on_log, on_complete=self._on_complete)
@@ -152,7 +173,6 @@ class App(ctk.CTk):
         self.pref_auto_analyze_var = ctk.BooleanVar(value=bool(self.preferences.get("auto_analyze", False)))
         self.pref_history_limit_var = ctk.StringVar(value=str(int(self.preferences.get("history_limit", 30))))
         self.pref_default_dir_var = ctk.StringVar(value=self.default_output_dir)
-        self.pref_remember_window_var = ctk.BooleanVar(value=self._remember_window_size)
         self.current_job = None
         self.logs_visible = True
         self._save_job = None
@@ -199,7 +219,7 @@ class App(ctk.CTk):
             "auto_analyze": False,
             "history_limit": 30,
             "default_output_dir": "",
-            "remember_window_size": True,
+            "remember_window_size": False,
         }
         raw = self.settings.get("preferences", {})
         pref = dict(defaults)
@@ -219,7 +239,7 @@ class App(ctk.CTk):
             pref["history_limit"] = 30
         pref["show_logs"] = bool(pref.get("show_logs", True))
         pref["auto_analyze"] = bool(pref.get("auto_analyze", False))
-        pref["remember_window_size"] = bool(pref.get("remember_window_size", True))
+        pref["remember_window_size"] = False
         mode = str(pref.get("ui_density_mode", "auto")).lower().strip()
         pref["ui_density_mode"] = mode if mode in ("auto", "regular", "compact") else "auto"
         default_dir = str(pref.get("default_output_dir", "")).strip()
@@ -283,7 +303,7 @@ class App(ctk.CTk):
             text="▶",
             width=28,
             height=28,
-            text_color="#F6F8FF",
+            text_color="#FFFFFF",
             fg_color="#DA3C3C",
             corner_radius=6,
             font=self.fonts["brand_icon"],
@@ -292,7 +312,7 @@ class App(ctk.CTk):
             brand,
             text="YT-MEDIA DOWNLOADER",
             font=self.fonts["brand_title"],
-            text_color="#EAF0FF",
+            text_color="#FFFFFF",
         ).grid(row=0, column=1, sticky="w")
 
         self.nav_strip = ctk.CTkFrame(self.top_bar, fg_color="transparent")
@@ -305,7 +325,7 @@ class App(ctk.CTk):
                 height=34,
                 fg_color="transparent",
                 hover_color=self.palette["panel_soft"],
-                text_color=self.palette["text_muted"],
+                text_color="#9E9E9E",
                 font=self.fonts["nav"],
                 command=lambda x=p: self._show_page(x),
             )
@@ -326,9 +346,9 @@ class App(ctk.CTk):
         self.footer_bar.grid(row=2, column=0, sticky="ew")
         self.footer_bar.grid_propagate(False)
         self.footer_bar.grid_columnconfigure(0, weight=1)
-        self.footer_left = ctk.CTkLabel(self.footer_bar, text="Ready", text_color="#D7E4FF", font=self.fonts["footer"])
+        self.footer_left = ctk.CTkLabel(self.footer_bar, text="Ready", text_color="#FFFFFF", font=self.fonts["footer"])
         self.footer_left.grid(row=0, column=0, padx=16, pady=6, sticky="w")
-        self.footer_right = ctk.CTkLabel(self.footer_bar, text="0.0 MiB/s", text_color=self.palette["text_muted"], font=self.fonts["footer"])
+        self.footer_right = ctk.CTkLabel(self.footer_bar, text="0.0 MiB/s", text_color="#9E9E9E", font=self.fonts["footer"])
         self.footer_right.grid(row=0, column=1, padx=16, pady=6, sticky="e")
     def _build_downloader_page(self):
         gap = self.spacing_profiles["regular"]
@@ -340,10 +360,10 @@ class App(ctk.CTk):
         self.downloader_scroll.grid(row=0, column=0, sticky="nsew")
         self.downloader_scroll.grid_columnconfigure(0, weight=1)
 
-        self.mode_card = ctk.CTkFrame(self.downloader_scroll, fg_color=self.palette["panel"], corner_radius=14, border_width=1, border_color=self.palette["line"])
+        self.mode_card = ctk.CTkFrame(self.downloader_scroll, fg_color=self.palette["panel"], corner_radius=8, border_width=1, border_color=self.palette["line"])
         self.mode_card.grid(row=0, column=0, sticky="ew", padx=gap["outer_pad"], pady=(gap["outer_pad"], gap["row_gap"]))
         self.mode_card.grid_columnconfigure(0, weight=1)
-        self.mode_label = ctk.CTkLabel(self.mode_card, text="Content Type", text_color="#DCE8FF", font=self.fonts["body_sm"])
+        self.mode_label = ctk.CTkLabel(self.mode_card, text="Content Type", text_color="#FFFFFF", font=self.fonts["body_sm"])
         self.mode_label.grid(row=0, column=0, padx=gap["card_pad"], pady=(10, 4), sticky="w")
         self.mode_switch = ctk.CTkSegmentedButton(
             self.mode_card,
@@ -353,22 +373,21 @@ class App(ctk.CTk):
             selected_color=self.palette["accent"],
             selected_hover_color=self.palette["accent_hover"],
             unselected_color=self.palette["panel_soft"],
-            unselected_hover_color="#1C3263",
-            text_color="#DCE8FF",
+            unselected_hover_color=self.palette["panel_alt"],
+            text_color="#FFFFFF",
             font=self.fonts["body_sm"],
             height=34,
         )
         self.mode_switch.grid(row=1, column=0, padx=gap["card_pad"], pady=(0, 12), sticky="ew")
 
-        self.url_card = ctk.CTkFrame(self.downloader_scroll, fg_color=self.palette["panel"], corner_radius=14, border_width=1, border_color=self.palette["line"])
+        self.url_card = ctk.CTkFrame(self.downloader_scroll, fg_color=self.palette["panel"], corner_radius=8, border_width=1, border_color=self.palette["line"])
         self.url_card.grid(row=1, column=0, sticky="ew", padx=gap["outer_pad"], pady=(0, gap["row_gap"]))
         self.url_card.grid_columnconfigure(0, weight=1)
         self.url_entry = ctk.CTkEntry(
             self.url_card,
             height=42,
-            corner_radius=10,
+            corner_radius=8, border_width=1, border_color=self.palette["line"],
             fg_color=self.palette["panel_soft"],
-            border_color=self.palette["line"],
             placeholder_text="Paste media URL (e.g., https://www.youtube.com/watch?v=...)",
             font=self.fonts["body_sm"],
         )
@@ -378,11 +397,9 @@ class App(ctk.CTk):
             text="Analyze",
             width=112,
             height=42,
-            corner_radius=10,
+            corner_radius=8, border_width=1, border_color=self.palette["line"],
             fg_color=self.palette["accent"],
             hover_color=self.palette["accent_hover"],
-            border_width=1,
-            border_color="#6A96FF",
             font=self.fonts["button"],
             command=self._analyze,
         )
@@ -390,12 +407,12 @@ class App(ctk.CTk):
         self.url_hint = ctk.CTkLabel(
             self.url_card,
             text="Supported sources: YouTube, Vimeo, Dailymotion, and other compatible platforms.",
-            text_color=self.palette["text_muted"],
+            text_color="#9E9E9E",
             font=self.fonts["meta"],
         )
         self.url_hint.grid(row=1, column=0, columnspan=2, padx=gap["outer_pad"], pady=(0, 12), sticky="w")
 
-        self.preview_card = ctk.CTkFrame(self.downloader_scroll, fg_color=self.palette["panel"], corner_radius=14, border_width=1, border_color=self.palette["line"])
+        self.preview_card = ctk.CTkFrame(self.downloader_scroll, fg_color=self.palette["panel"], corner_radius=8, border_width=1, border_color=self.palette["line"])
         self.preview_card.grid(row=2, column=0, sticky="ew", padx=gap["outer_pad"], pady=(0, gap["row_gap"]))
         self.preview_card.grid_columnconfigure(1, weight=1)
         self.preview_thumb = ctk.CTkLabel(
@@ -404,9 +421,9 @@ class App(ctk.CTk):
             image=self.preview_placeholder,
             width=250,
             height=140,
-            corner_radius=10,
+            corner_radius=8,
             fg_color=self.palette["panel_soft"],
-            text_color=self.palette["text_muted"],
+            text_color="#9E9E9E",
             compound="center",
             font=self.fonts["meta"],
         )
@@ -417,16 +434,16 @@ class App(ctk.CTk):
             anchor="w",
             justify="left",
             wraplength=650,
-            text_color="#EDF3FF",
+            text_color="#FFFFFF",
             font=self.fonts["h1"],
         )
         self.preview_title.grid(row=0, column=1, padx=(0, gap["card_pad"]), pady=(18, 6), sticky="ew")
         self.preview_mode_chip = ctk.CTkLabel(
             self.preview_card,
             text="VIDEO",
-            text_color="#EAF2FF",
-            fg_color="#1D3565",
-            corner_radius=8,
+            text_color="#FFFFFF",
+            fg_color=self.palette["panel_soft"],
+            corner_radius=6,
             padx=10,
             pady=4,
             font=self.fonts["chip"],
@@ -438,7 +455,7 @@ class App(ctk.CTk):
             anchor="w",
             justify="left",
             wraplength=650,
-            text_color=self.palette["text_muted"],
+            text_color="#9E9E9E",
             font=self.fonts["body_sm"],
         )
         self.preview_meta.grid(row=1, column=1, columnspan=2, padx=(0, gap["card_pad"]), pady=(0, 6), sticky="ew")
@@ -448,39 +465,39 @@ class App(ctk.CTk):
             anchor="w",
             justify="left",
             wraplength=650,
-            text_color="#BCD0FF",
+            text_color="#FFFFFF",
             font=self.fonts["body_sm"],
         )
         self.preview_status.grid(row=2, column=1, columnspan=2, padx=(0, gap["card_pad"]), pady=(0, 8), sticky="ew")
-        self.preview_details = ctk.CTkFrame(self.preview_card, fg_color=self.palette["panel_soft"], corner_radius=10, border_width=1, border_color=self.palette["line"])
+        self.preview_details = ctk.CTkFrame(self.preview_card, fg_color=self.palette["panel_soft"], corner_radius=8, border_width=1, border_color=self.palette["line"],)
         self.preview_details.grid(row=3, column=1, columnspan=2, padx=(0, gap["card_pad"]), pady=(0, gap["card_pad"]), sticky="ew")
         self.preview_details.grid_columnconfigure((0, 1, 2), weight=1)
-        self.preview_detail_left = ctk.CTkLabel(self.preview_details, text="Type: Video", anchor="w", text_color="#DDE9FF", font=self.fonts["meta"])
+        self.preview_detail_left = ctk.CTkLabel(self.preview_details, text="Type: Video", anchor="w", text_color="#FFFFFF", font=self.fonts["meta"])
         self.preview_detail_left.grid(row=0, column=0, padx=10, pady=8, sticky="w")
-        self.preview_detail_mid = ctk.CTkLabel(self.preview_details, text="Output: MP4", anchor="center", text_color=self.palette["text_muted"], font=self.fonts["meta"])
+        self.preview_detail_mid = ctk.CTkLabel(self.preview_details, text="Output: MP4", anchor="center", text_color="#9E9E9E", font=self.fonts["meta"])
         self.preview_detail_mid.grid(row=0, column=1, padx=10, pady=8)
-        self.preview_detail_right = ctk.CTkLabel(self.preview_details, text="Best quality", anchor="e", text_color=self.palette["text_muted"], font=self.fonts["meta"])
+        self.preview_detail_right = ctk.CTkLabel(self.preview_details, text="Best quality", anchor="e", text_color="#9E9E9E", font=self.fonts["meta"])
         self.preview_detail_right.grid(row=0, column=2, padx=10, pady=8, sticky="e")
 
-        self.opts_card = ctk.CTkFrame(self.downloader_scroll, fg_color=self.palette["panel"], corner_radius=14, border_width=1, border_color=self.palette["line"])
+        self.opts_card = ctk.CTkFrame(self.downloader_scroll, fg_color=self.palette["panel"], corner_radius=8, border_width=1, border_color=self.palette["line"])
         self.opts_card.grid(row=3, column=0, sticky="ew", padx=gap["outer_pad"], pady=(0, gap["row_gap"]))
         self.opts_card.grid_columnconfigure((0, 1, 2, 3), weight=1)
-        self.lbl_quality = ctk.CTkLabel(self.opts_card, text="Quality", text_color="#DCE8FF", font=self.fonts["body_sm"])
+        self.lbl_quality = ctk.CTkLabel(self.opts_card, text="Quality", text_color="#FFFFFF", font=self.fonts["body_sm"])
         self.lbl_quality.grid(row=0, column=0, padx=12, pady=(14, 6), sticky="w")
-        self.quality_menu = ctk.CTkOptionMenu(self.opts_card, height=36, font=self.fonts["body_sm"], dropdown_font=self.fonts["body_sm"])
+        self.quality_menu = ctk.CTkOptionMenu(self.opts_card,fg_color=self.palette["panel_soft"], button_color=self.palette["panel_soft"], button_hover_color=self.palette["panel_alt"], dropdown_hover_color=self.palette["accent"],  height=36, font=self.fonts["body_sm"], dropdown_font=self.fonts["body_sm"])
         self.quality_menu.grid(row=1, column=0, padx=12, pady=(0, 14), sticky="ew")
-        self.lbl_playlist_type = ctk.CTkLabel(self.opts_card, text="Playlist Type", text_color="#DCE8FF", font=self.fonts["body_sm"])
+        self.lbl_playlist_type = ctk.CTkLabel(self.opts_card, text="Playlist Type", text_color="#FFFFFF", font=self.fonts["body_sm"])
         self.lbl_playlist_type.grid(row=0, column=1, padx=12, pady=(14, 6), sticky="w")
         self.playlist_type = ctk.CTkOptionMenu(
             self.opts_card,
-            values=["Video", "Audio"],
+            values=["Video", "Audio"],fg_color=self.palette["panel_soft"], button_color=self.palette["panel_soft"], button_hover_color=self.palette["panel_alt"], dropdown_hover_color=self.palette["accent"], 
             height=36,
             command=lambda _: self._on_playlist_type(),
             font=self.fonts["body_sm"],
             dropdown_font=self.fonts["body_sm"],
         )
         self.playlist_type.grid(row=1, column=1, padx=12, pady=(0, 14), sticky="ew")
-        self.lbl_max_items = ctk.CTkLabel(self.opts_card, text="Max Items", text_color="#DCE8FF", font=self.fonts["body_sm"])
+        self.lbl_max_items = ctk.CTkLabel(self.opts_card, text="Max Items", text_color="#FFFFFF", font=self.fonts["body_sm"])
         self.lbl_max_items.grid(row=0, column=2, padx=12, pady=(14, 6), sticky="w")
         self.max_items = ctk.CTkEntry(self.opts_card, height=36, placeholder_text="All", font=self.fonts["body_sm"])
         self.max_items.grid(row=1, column=2, padx=12, pady=(0, 14), sticky="ew")
@@ -493,16 +510,16 @@ class App(ctk.CTk):
         self.options_hint = ctk.CTkLabel(
             self.opts_card,
             text="",
-            text_color=self.palette["text_muted"],
+            text_color="#9E9E9E",
             font=self.fonts["meta"],
             anchor="w",
             justify="left",
         )
 
-        self.output_card = ctk.CTkFrame(self.downloader_scroll, fg_color=self.palette["panel"], corner_radius=14, border_width=1, border_color=self.palette["line"])
+        self.output_card = ctk.CTkFrame(self.downloader_scroll, fg_color=self.palette["panel"], corner_radius=8, border_width=1, border_color=self.palette["line"])
         self.output_card.grid(row=4, column=0, sticky="ew", padx=gap["outer_pad"], pady=(0, gap["row_gap"]))
         self.output_card.grid_columnconfigure(0, weight=1)
-        self.dir_entry = ctk.CTkEntry(self.output_card, height=38, state="readonly", fg_color=self.palette["panel_soft"], border_color=self.palette["line"], font=self.fonts["body_sm"])
+        self.dir_entry = ctk.CTkEntry(self.output_card, height=38, state="readonly", fg_color=self.palette["panel_soft"], font=self.fonts["body_sm"])
         self.dir_entry.grid(row=0, column=0, padx=(gap["card_pad"], 10), pady=14, sticky="ew")
         self.change_dir_btn = ctk.CTkButton(
             self.output_card,
@@ -510,15 +527,13 @@ class App(ctk.CTk):
             width=100,
             height=38,
             fg_color=self.palette["panel_soft"],
-            hover_color="#1B325E",
-            border_width=1,
-            border_color=self.palette["line"],
+            hover_color=self.palette["panel_alt"], border_width=1, border_color=self.palette["line"],
             font=self.fonts["body_sm"],
             command=self._browse,
         )
         self.change_dir_btn.grid(row=0, column=1, padx=(0, gap["card_pad"]), pady=14)
 
-        self.action_card = ctk.CTkFrame(self.downloader_scroll, fg_color=self.palette["panel"], corner_radius=14, border_width=1, border_color=self.palette["line"])
+        self.action_card = ctk.CTkFrame(self.downloader_scroll, fg_color=self.palette["panel"], corner_radius=8, border_width=1, border_color=self.palette["line"])
         self.action_card.grid(row=5, column=0, sticky="ew", padx=gap["outer_pad"], pady=(0, gap["outer_pad"]))
         self.action_card.grid_columnconfigure(0, weight=1)
         self.download_btn = ctk.CTkButton(
@@ -527,8 +542,6 @@ class App(ctk.CTk):
             height=44,
             fg_color=self.palette["accent"],
             hover_color=self.palette["accent_hover"],
-            border_width=1,
-            border_color="#6A96FF",
             font=self.fonts["button_lg"],
             command=self.trigger_action,
         )
@@ -536,39 +549,37 @@ class App(ctk.CTk):
         meta = ctk.CTkFrame(self.action_card, fg_color="transparent")
         meta.grid(row=1, column=0, padx=gap["card_pad"], pady=(0, 12), sticky="ew")
         meta.grid_columnconfigure((0, 1, 2), weight=1)
-        self.prog_pct = ctk.CTkLabel(meta, text="0.0%", font=self.fonts["section_title"], text_color="#E4EEFF")
+        self.prog_pct = ctk.CTkLabel(meta, text="0.0%", font=self.fonts["section_title"], text_color="#FFFFFF")
         self.prog_pct.grid(row=0, column=0, sticky="w")
-        self.prog_speed = ctk.CTkLabel(meta, text="0.0 MiB/s", text_color=self.palette["text_muted"], font=self.fonts["body_sm"])
+        self.prog_speed = ctk.CTkLabel(meta, text="0.0 MiB/s", text_color="#9E9E9E", font=self.fonts["body_sm"])
         self.prog_speed.grid(row=0, column=1)
-        self.prog_eta = ctk.CTkLabel(meta, text="ETA --:--", text_color=self.palette["text_muted"], font=self.fonts["body_sm"])
+        self.prog_eta = ctk.CTkLabel(meta, text="ETA --:--", text_color="#9E9E9E", font=self.fonts["body_sm"])
         self.prog_eta.grid(row=0, column=2, sticky="e")
-        self.prog_bar = ctk.CTkProgressBar(meta, height=8, progress_color=self.palette["accent"], fg_color="#1A2E5A")
+        self.prog_bar = ctk.CTkProgressBar(meta, height=8, progress_color=self.palette["accent"], fg_color=self.palette["panel_alt"])
         self.prog_bar.grid(row=1, column=0, columnspan=3, sticky="ew", pady=(8, 6))
         self.prog_bar.set(0)
-        self.prog_title = ctk.CTkLabel(meta, text="Ready.", text_color="#CAD8F8", font=self.fonts["meta"])
+        self.prog_title = ctk.CTkLabel(meta, text="Ready.", text_color="#FFFFFF", font=self.fonts["meta"])
         self.prog_title.grid(row=2, column=0, columnspan=3, sticky="w")
 
-        self.queue_card = ctk.CTkFrame(self.downloader_scroll, fg_color=self.palette["panel"], corner_radius=14, border_width=1, border_color=self.palette["line"])
+        self.queue_card = ctk.CTkFrame(self.downloader_scroll, fg_color=self.palette["panel"], corner_radius=8, border_width=1, border_color=self.palette["line"])
         self.queue_card.grid(row=6, column=0, sticky="ew", padx=gap["outer_pad"], pady=(0, gap["outer_pad"]))
         self.queue_card.grid_columnconfigure(0, weight=1)
         q_head = ctk.CTkFrame(self.queue_card, fg_color="transparent")
         q_head.grid(row=0, column=0, padx=12, pady=(10, 6), sticky="ew")
         q_head.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(q_head, text="Recent Activity", text_color="#E6EFFF", font=self.fonts["section_title"]).grid(row=0, column=0, sticky="w")
+        ctk.CTkLabel(q_head, text="Recent Activity", text_color="#FFFFFF", font=self.fonts["section_title"]).grid(row=0, column=0, sticky="w")
         self.open_downloads_btn = ctk.CTkButton(
             q_head,
             text="Open Downloads",
             width=120,
             height=28,
             fg_color=self.palette["panel_soft"],
-            hover_color="#1B325E",
-            border_width=1,
-            border_color=self.palette["line"],
+            hover_color=self.palette["panel_alt"], border_width=1, border_color=self.palette["line"],
             font=self.fonts["body_sm"],
             command=lambda: self._show_page("Downloads"),
         )
         self.open_downloads_btn.grid(row=0, column=1, sticky="e")
-        self.queue_preview = SmoothScrollableFrame(self.queue_card, fg_color=self.palette["panel_soft"], corner_radius=10, height=180, scroll_speed_getter=lambda: self._scroll_speed)
+        self.queue_preview = SmoothScrollableFrame(self.queue_card, fg_color=self.palette["panel_soft"], corner_radius=8, border_width=1, border_color=self.palette["line"], height=180, scroll_speed_getter=lambda: self._scroll_speed)
         self.queue_preview.grid(row=1, column=0, padx=12, pady=(0, 12), sticky="ew")
         self.queue_preview.grid_columnconfigure(0, weight=1)
 
@@ -583,48 +594,48 @@ class App(ctk.CTk):
         self.downloads_scroll.grid(row=0, column=0, sticky="nsew")
         self.downloads_scroll.grid_columnconfigure(0, weight=1)
 
-        self.stats_card = ctk.CTkFrame(self.downloads_scroll, fg_color=self.palette["panel"], corner_radius=14, border_width=1, border_color=self.palette["line"])
+        self.stats_card = ctk.CTkFrame(self.downloads_scroll, fg_color=self.palette["panel"], corner_radius=8, border_width=1, border_color=self.palette["line"])
         self.stats_card.grid(row=0, column=0, sticky="ew", padx=gap["outer_pad"], pady=(gap["outer_pad"], gap["row_gap"]))
         self.stats_card.grid_columnconfigure((0, 1, 2), weight=1)
-        self.stats_completed = ctk.CTkLabel(self.stats_card, text="Completed: 0", text_color="#66D3A1", font=self.fonts["section_title"])
+        self.stats_completed = ctk.CTkLabel(self.stats_card, text="Completed: 0", text_color="#FFFFFF", font=self.fonts["section_title"])
         self.stats_completed.grid(row=0, column=0, padx=14, pady=12, sticky="w")
-        self.stats_cancelled = ctk.CTkLabel(self.stats_card, text="Cancelled: 0", text_color="#E3C16B", font=self.fonts["section_title"])
+        self.stats_cancelled = ctk.CTkLabel(self.stats_card, text="Cancelled: 0", text_color="#FFFFFF", font=self.fonts["section_title"])
         self.stats_cancelled.grid(row=0, column=1, padx=14, pady=12)
-        self.stats_failed = ctk.CTkLabel(self.stats_card, text="Failed: 0", text_color="#E17C7C", font=self.fonts["section_title"])
+        self.stats_failed = ctk.CTkLabel(self.stats_card, text="Failed: 0", text_color="#FFFFFF", font=self.fonts["section_title"])
         self.stats_failed.grid(row=0, column=2, padx=14, pady=12, sticky="e")
 
-        self.current_card = ctk.CTkFrame(self.downloads_scroll, fg_color=self.palette["panel"], corner_radius=14, border_width=1, border_color=self.palette["line"])
+        self.current_card = ctk.CTkFrame(self.downloads_scroll, fg_color=self.palette["panel"], corner_radius=8, border_width=1, border_color=self.palette["line"])
         self.current_card.grid(row=1, column=0, sticky="ew", padx=gap["outer_pad"], pady=(0, gap["row_gap"]))
         self.current_card.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(self.current_card, text="Current Job", text_color="#E6EFFF", font=self.fonts["section_title"]).grid(row=0, column=0, padx=14, pady=(12, 6), sticky="w")
-        self.current_badge = ctk.CTkLabel(self.current_card, text="IDLE", text_color="#D9E8FF", fg_color="#1D3565", corner_radius=8, padx=10, pady=4, font=self.fonts["chip"])
+        ctk.CTkLabel(self.current_card, text="Current Job", text_color="#FFFFFF", font=self.fonts["section_title"]).grid(row=0, column=0, padx=14, pady=(12, 6), sticky="w")
+        self.current_badge = ctk.CTkLabel(self.current_card, text="IDLE", text_color="#FFFFFF", fg_color=self.palette["panel_soft"], corner_radius=6, padx=10, pady=4, font=self.fonts["chip"])
         self.current_badge.grid(row=0, column=1, padx=(0, 14), pady=(12, 6), sticky="e")
-        self.current_title = ctk.CTkLabel(self.current_card, text="No active download.", anchor="w", text_color="#D6E5FF", font=self.fonts["body"])
+        self.current_title = ctk.CTkLabel(self.current_card, text="No active download.", anchor="w", text_color="#FFFFFF", font=self.fonts["body"])
         self.current_title.grid(row=1, column=0, padx=14, sticky="w")
-        self.current_meta = ctk.CTkLabel(self.current_card, text="", anchor="w", text_color=self.palette["text_muted"], font=self.fonts["body_sm"])
+        self.current_meta = ctk.CTkLabel(self.current_card, text="", anchor="w", text_color="#9E9E9E", font=self.fonts["body_sm"])
         self.current_meta.grid(row=2, column=0, padx=14, pady=(0, 8), sticky="w")
-        self.current_progress = ctk.CTkProgressBar(self.current_card, height=8, progress_color=self.palette["accent"], fg_color="#1A2E5A")
+        self.current_progress = ctk.CTkProgressBar(self.current_card, height=8, progress_color=self.palette["accent"], fg_color=self.palette["panel_alt"])
         self.current_progress.grid(row=3, column=0, padx=14, pady=(0, 12), sticky="ew")
         self.current_progress.set(0)
 
-        self.logs_card = ctk.CTkFrame(self.downloads_scroll, fg_color=self.palette["panel"], corner_radius=14, border_width=1, border_color=self.palette["line"])
+        self.logs_card = ctk.CTkFrame(self.downloads_scroll, fg_color=self.palette["panel"], corner_radius=8, border_width=1, border_color=self.palette["line"])
         self.logs_card.grid(row=2, column=0, sticky="ew", padx=gap["outer_pad"], pady=(0, gap["row_gap"]))
         self.logs_card.grid_columnconfigure(0, weight=1)
         top = ctk.CTkFrame(self.logs_card, fg_color="transparent")
         top.grid(row=0, column=0, padx=12, pady=(8, 4), sticky="ew")
         top.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(top, text="Activity Log", text_color="#E6EFFF", font=self.fonts["section_title"]).grid(row=0, column=0, sticky="w")
-        self.btn_logs = ctk.CTkButton(top, text="Hide Logs", width=90, height=28, fg_color=self.palette["panel_soft"], hover_color="#1B325E", font=self.fonts["body_sm"], command=self.toggle_logs)
+        ctk.CTkLabel(top, text="Activity Log", text_color="#FFFFFF", font=self.fonts["section_title"]).grid(row=0, column=0, sticky="w")
+        self.btn_logs = ctk.CTkButton(top, text="Hide Logs", width=90, height=28, fg_color=self.palette["panel_soft"], hover_color=self.palette["panel_alt"], font=self.fonts["body_sm"], command=self.toggle_logs)
         self.btn_logs.grid(row=0, column=1, sticky="e")
         self.log_box = ctk.CTkTextbox(self.logs_card, height=170, wrap="word", font=self.fonts["code"])
         self.log_box.grid(row=1, column=0, padx=12, pady=(0, 12), sticky="ew")
         self.log_box.configure(state="disabled")
 
-        self.history_card = ctk.CTkFrame(self.downloads_scroll, fg_color=self.palette["panel"], corner_radius=14, border_width=1, border_color=self.palette["line"])
+        self.history_card = ctk.CTkFrame(self.downloads_scroll, fg_color=self.palette["panel"], corner_radius=8, border_width=1, border_color=self.palette["line"])
         self.history_card.grid(row=3, column=0, sticky="ew", padx=gap["outer_pad"], pady=(0, gap["outer_pad"]))
         self.history_card.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(self.history_card, text="History", text_color="#E6EFFF", font=self.fonts["section_title"]).grid(row=0, column=0, padx=14, pady=(12, 8), sticky="w")
-        self.history_list = SmoothScrollableFrame(self.history_card, fg_color=self.palette["panel_soft"], corner_radius=10, height=260, scroll_speed_getter=lambda: self._scroll_speed)
+        ctk.CTkLabel(self.history_card, text="History", text_color="#FFFFFF", font=self.fonts["section_title"]).grid(row=0, column=0, padx=14, pady=(12, 8), sticky="w")
+        self.history_list = SmoothScrollableFrame(self.history_card, fg_color=self.palette["panel_soft"], corner_radius=8, border_width=1, border_color=self.palette["line"], height=260, scroll_speed_getter=lambda: self._scroll_speed)
         self.history_list.grid(row=1, column=0, padx=12, pady=(0, 12), sticky="ew")
         self.history_list.grid_columnconfigure(0, weight=1)
 
@@ -639,66 +650,65 @@ class App(ctk.CTk):
         s.grid(row=0, column=0, sticky="nsew")
         s.grid_columnconfigure(0, weight=1)
 
-        ui_card = ctk.CTkFrame(s, fg_color=self.palette["panel"], corner_radius=14, border_width=1, border_color=self.palette["line"])
+        ui_card = ctk.CTkFrame(s, fg_color=self.palette["panel"], corner_radius=8, border_width=1, border_color=self.palette["line"])
         ui_card.grid(row=0, column=0, sticky="ew", padx=gap["outer_pad"], pady=(gap["outer_pad"], gap["row_gap"]))
         ui_card.grid_columnconfigure((0, 1), weight=1)
-        ctk.CTkLabel(ui_card, text="Interface", text_color="#E6EFFF", font=self.fonts["section_title"]).grid(row=0, column=0, columnspan=2, padx=14, pady=(12, 10), sticky="w")
+        ctk.CTkLabel(ui_card, text="Interface", text_color="#FFFFFF", font=self.fonts["section_title"]).grid(row=0, column=0, columnspan=2, padx=14, pady=(12, 10), sticky="w")
 
-        ctk.CTkLabel(ui_card, text="Density Mode", text_color="#DCE8FF", font=self.fonts["body_sm"]).grid(row=1, column=0, padx=14, pady=(0, 4), sticky="w")
-        self.settings_density_menu = ctk.CTkOptionMenu(ui_card, values=["Auto", "Regular", "Compact"], variable=self.pref_density_var, command=lambda _: self._on_settings_density(), font=self.fonts["body_sm"], dropdown_font=self.fonts["body_sm"], height=34)
+        ctk.CTkLabel(ui_card, text="Density Mode", text_color="#FFFFFF", font=self.fonts["body_sm"]).grid(row=1, column=0, padx=14, pady=(0, 4), sticky="w")
+        self.settings_density_menu = ctk.CTkOptionMenu(ui_card, values=["Auto", "Regular", "Compact"],fg_color=self.palette["panel_soft"], button_color=self.palette["panel_soft"], button_hover_color=self.palette["panel_alt"], dropdown_hover_color=self.palette["accent"],  variable=self.pref_density_var, command=lambda _: self._on_settings_density(), font=self.fonts["body_sm"], dropdown_font=self.fonts["body_sm"], height=34)
         self.settings_density_menu.grid(row=2, column=0, padx=14, pady=(0, 12), sticky="ew")
 
-        ctk.CTkLabel(ui_card, text="Log Panel", text_color="#DCE8FF", font=self.fonts["body_sm"]).grid(row=1, column=1, padx=14, pady=(0, 4), sticky="w")
+        ctk.CTkLabel(ui_card, text="Log Panel", text_color="#FFFFFF", font=self.fonts["body_sm"]).grid(row=1, column=1, padx=14, pady=(0, 4), sticky="w")
         self.settings_show_logs_switch = ctk.CTkSwitch(ui_card, text="Show log panel in Downloads", variable=self.pref_show_logs_var, progress_color=self.palette["accent"], font=self.fonts["body_sm"], command=self._on_settings_show_logs)
         self.settings_show_logs_switch.grid(row=2, column=1, padx=14, pady=(0, 12), sticky="w")
 
-        ctk.CTkLabel(ui_card, text="Font Scale", text_color="#DCE8FF", font=self.fonts["body_sm"]).grid(row=3, column=0, padx=14, pady=(0, 4), sticky="w")
-        self.settings_font_slider = ctk.CTkSlider(ui_card, from_=85, to=125, variable=self.pref_font_scale_var, number_of_steps=40, progress_color=self.palette["accent"], button_color="#6C97FF", button_hover_color="#87AEFF", command=lambda _: self._on_settings_font_scale())
+        ctk.CTkLabel(ui_card, text="Font Scale", text_color="#FFFFFF", font=self.fonts["body_sm"]).grid(row=3, column=0, padx=14, pady=(0, 4), sticky="w")
+        self.settings_font_slider = ctk.CTkSlider(ui_card,from_=85, to=125, variable=self.pref_font_scale_var, number_of_steps=40, progress_color=self.palette["accent"], button_color=self.palette["accent"], button_hover_color=self.palette["accent_hover"], command=lambda _: self._on_settings_font_scale())
         self.settings_font_slider.grid(row=4, column=0, padx=14, pady=(0, 6), sticky="ew")
-        self.settings_font_label = ctk.CTkLabel(ui_card, text="100%", text_color=self.palette["text_muted"], font=self.fonts["meta"])
+        self.settings_font_label = ctk.CTkLabel(ui_card, text="100%", text_color="#9E9E9E", font=self.fonts["meta"])
         self.settings_font_label.grid(row=5, column=0, padx=14, pady=(0, 12), sticky="w")
 
-        ctk.CTkLabel(ui_card, text="Scroll Smoothness", text_color="#DCE8FF", font=self.fonts["body_sm"]).grid(row=3, column=1, padx=14, pady=(0, 4), sticky="w")
-        self.settings_scroll_slider = ctk.CTkSlider(ui_card, from_=60, to=170, variable=self.pref_scroll_speed_var, number_of_steps=55, progress_color=self.palette["accent"], button_color="#6C97FF", button_hover_color="#87AEFF", command=lambda _: self._on_settings_scroll_speed())
+        ctk.CTkLabel(ui_card, text="Scroll Smoothness", text_color="#FFFFFF", font=self.fonts["body_sm"]).grid(row=3, column=1, padx=14, pady=(0, 4), sticky="w")
+        self.settings_scroll_slider = ctk.CTkSlider(ui_card,from_=60, to=170, variable=self.pref_scroll_speed_var, number_of_steps=55, progress_color=self.palette["accent"], button_color=self.palette["accent"], button_hover_color=self.palette["accent_hover"], command=lambda _: self._on_settings_scroll_speed())
         self.settings_scroll_slider.grid(row=4, column=1, padx=14, pady=(0, 6), sticky="ew")
-        self.settings_scroll_label = ctk.CTkLabel(ui_card, text="100%", text_color=self.palette["text_muted"], font=self.fonts["meta"])
+        self.settings_scroll_label = ctk.CTkLabel(ui_card, text="100%", text_color="#9E9E9E", font=self.fonts["meta"])
         self.settings_scroll_label.grid(row=5, column=1, padx=14, pady=(0, 12), sticky="w")
 
-        behavior_card = ctk.CTkFrame(s, fg_color=self.palette["panel"], corner_radius=14, border_width=1, border_color=self.palette["line"])
+        behavior_card = ctk.CTkFrame(s, fg_color=self.palette["panel"], corner_radius=8, border_width=1, border_color=self.palette["line"])
         behavior_card.grid(row=1, column=0, sticky="ew", padx=gap["outer_pad"], pady=(0, gap["row_gap"]))
         behavior_card.grid_columnconfigure((0, 1), weight=1)
-        ctk.CTkLabel(behavior_card, text="Behavior", text_color="#E6EFFF", font=self.fonts["section_title"]).grid(row=0, column=0, columnspan=2, padx=14, pady=(12, 10), sticky="w")
+        ctk.CTkLabel(behavior_card, text="Behavior", text_color="#FFFFFF", font=self.fonts["section_title"]).grid(row=0, column=0, columnspan=2, padx=14, pady=(12, 10), sticky="w")
 
         self.settings_auto_analyze = ctk.CTkSwitch(behavior_card, text="Auto-analyze pasted URLs", variable=self.pref_auto_analyze_var, progress_color=self.palette["accent"], font=self.fonts["body_sm"], command=self._on_settings_auto_analyze)
         self.settings_auto_analyze.grid(row=1, column=0, padx=14, pady=(0, 10), sticky="w")
-        self.settings_remember_window = ctk.CTkSwitch(behavior_card, text="Remember window size between launches", variable=self.pref_remember_window_var, progress_color=self.palette["accent"], font=self.fonts["body_sm"], command=self._on_settings_remember_window)
-        self.settings_remember_window.grid(row=1, column=1, padx=14, pady=(0, 10), sticky="w")
+        ctk.CTkLabel(behavior_card, text="Startup size: always minimum window size", text_color=self.palette["text_muted"], font=self.fonts["body_sm"]).grid(row=1, column=1, padx=14, pady=(0, 10), sticky="w")
 
-        ctk.CTkLabel(behavior_card, text="Current Mode", text_color="#DCE8FF", font=self.fonts["body_sm"]).grid(row=2, column=0, padx=14, pady=(0, 4), sticky="w")
-        self.settings_mode_menu = ctk.CTkOptionMenu(behavior_card, values=self.modes, variable=self.active_mode, command=lambda _: self._on_mode_change(), font=self.fonts["body_sm"], dropdown_font=self.fonts["body_sm"], height=34)
+        ctk.CTkLabel(behavior_card, text="Current Mode", text_color="#FFFFFF", font=self.fonts["body_sm"]).grid(row=2, column=0, padx=14, pady=(0, 4), sticky="w")
+        self.settings_mode_menu = ctk.CTkOptionMenu(behavior_card, values=self.modes,fg_color=self.palette["panel_soft"], button_color=self.palette["panel_soft"], button_hover_color=self.palette["panel_alt"], dropdown_hover_color=self.palette["accent"],  variable=self.active_mode, command=lambda _: self._on_mode_change(), font=self.fonts["body_sm"], dropdown_font=self.fonts["body_sm"], height=34)
         self.settings_mode_menu.grid(row=3, column=0, padx=14, pady=(0, 12), sticky="ew")
-        ctk.CTkButton(behavior_card, text="Open Downloader", height=34, fg_color=self.palette["panel_soft"], hover_color="#1B325E", border_width=1, border_color=self.palette["line"], font=self.fonts["body_sm"], command=lambda: self._show_page("Downloader")).grid(row=3, column=1, padx=14, pady=(0, 12), sticky="w")
+        ctk.CTkButton(behavior_card, text="Open Downloader", height=34, fg_color=self.palette["panel_soft"], hover_color=self.palette["panel_alt"], border_width=1, border_color=self.palette["line"], font=self.fonts["body_sm"], command=lambda: self._show_page("Downloader")).grid(row=3, column=1, padx=14, pady=(0, 12), sticky="w")
 
-        dl_card = ctk.CTkFrame(s, fg_color=self.palette["panel"], corner_radius=14, border_width=1, border_color=self.palette["line"])
+        dl_card = ctk.CTkFrame(s, fg_color=self.palette["panel"], corner_radius=8, border_width=1, border_color=self.palette["line"])
         dl_card.grid(row=2, column=0, sticky="ew", padx=gap["outer_pad"], pady=(0, gap["outer_pad"]))
         dl_card.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(dl_card, text="Download Defaults", text_color="#E6EFFF", font=self.fonts["section_title"]).grid(row=0, column=0, padx=14, pady=(12, 10), sticky="w")
+        ctk.CTkLabel(dl_card, text="Download Defaults", text_color="#FFFFFF", font=self.fonts["section_title"]).grid(row=0, column=0, padx=14, pady=(12, 10), sticky="w")
 
-        ctk.CTkLabel(dl_card, text="Default Output Folder", text_color="#DCE8FF", font=self.fonts["body_sm"]).grid(row=1, column=0, padx=14, pady=(0, 4), sticky="w")
+        ctk.CTkLabel(dl_card, text="Default Output Folder", text_color="#FFFFFF", font=self.fonts["body_sm"]).grid(row=1, column=0, padx=14, pady=(0, 4), sticky="w")
         folder_row = ctk.CTkFrame(dl_card, fg_color="transparent")
         folder_row.grid(row=2, column=0, padx=14, pady=(0, 10), sticky="ew")
         folder_row.grid_columnconfigure(0, weight=1)
-        self.settings_default_dir_entry = ctk.CTkEntry(folder_row, textvariable=self.pref_default_dir_var, state="readonly", height=36, fg_color=self.palette["panel_soft"], border_color=self.palette["line"], font=self.fonts["body_sm"])
+        self.settings_default_dir_entry = ctk.CTkEntry(folder_row, textvariable=self.pref_default_dir_var, state="readonly", height=36, fg_color=self.palette["panel_soft"], font=self.fonts["body_sm"])
         self.settings_default_dir_entry.grid(row=0, column=0, padx=(0, 8), sticky="ew")
-        ctk.CTkButton(folder_row, text="Browse", width=92, height=36, fg_color=self.palette["panel_soft"], hover_color="#1B325E", border_width=1, border_color=self.palette["line"], font=self.fonts["body_sm"], command=self._browse_default_output_dir).grid(row=0, column=1)
+        ctk.CTkButton(folder_row, text="Browse", width=92, height=36, fg_color=self.palette["panel_soft"], hover_color=self.palette["panel_alt"], border_width=1, border_color=self.palette["line"], font=self.fonts["body_sm"], command=self._browse_default_output_dir).grid(row=0, column=1)
 
         bottom_row = ctk.CTkFrame(dl_card, fg_color="transparent")
         bottom_row.grid(row=3, column=0, padx=14, pady=(0, 12), sticky="ew")
         bottom_row.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(bottom_row, text="History Limit", text_color="#DCE8FF", font=self.fonts["body_sm"]).grid(row=0, column=0, padx=(0, 8), sticky="w")
-        self.settings_history_limit_menu = ctk.CTkOptionMenu(bottom_row, values=["20", "30", "50", "75", "100", "150", "200"], variable=self.pref_history_limit_var, command=lambda _: self._on_settings_history_limit(), font=self.fonts["body_sm"], dropdown_font=self.fonts["body_sm"], width=110, height=32)
+        ctk.CTkLabel(bottom_row, text="History Limit", text_color="#FFFFFF", font=self.fonts["body_sm"]).grid(row=0, column=0, padx=(0, 8), sticky="w")
+        self.settings_history_limit_menu = ctk.CTkOptionMenu(bottom_row, values=["20", "30", "50", "75", "100", "150", "200"],fg_color=self.palette["panel_soft"], button_color=self.palette["panel_soft"], button_hover_color=self.palette["panel_alt"], dropdown_hover_color=self.palette["accent"],  variable=self.pref_history_limit_var, command=lambda _: self._on_settings_history_limit(), font=self.fonts["body_sm"], dropdown_font=self.fonts["body_sm"], width=110, height=32)
         self.settings_history_limit_menu.grid(row=0, column=1, sticky="w")
-        ctk.CTkButton(bottom_row, text="Apply Folder to All Modes", height=32, fg_color=self.palette["panel_soft"], hover_color="#1B325E", border_width=1, border_color=self.palette["line"], font=self.fonts["body_sm"], command=self._apply_default_output_dir_to_tabs).grid(row=0, column=2, padx=(12, 0), sticky="e")
+        ctk.CTkButton(bottom_row, text="Apply Folder to All Modes", height=32, fg_color=self.palette["panel_soft"], hover_color=self.palette["panel_alt"], border_width=1, border_color=self.palette["line"], font=self.fonts["body_sm"], command=self._apply_default_output_dir_to_tabs).grid(row=0, column=2, padx=(12, 0), sticky="e")
 
         self.pages["Settings"] = page
 
@@ -716,7 +726,7 @@ class App(ctk.CTk):
             "auto_analyze": bool(self.pref_auto_analyze_var.get()),
             "history_limit": history_limit,
             "default_output_dir": self.pref_default_dir_var.get().strip(),
-            "remember_window_size": bool(self.pref_remember_window_var.get()),
+            "remember_window_size": False,
         }
 
     def _apply_logs_visibility(self, visible):
@@ -753,10 +763,6 @@ class App(ctk.CTk):
     def _on_settings_auto_analyze(self):
         if self.pref_auto_analyze_var.get():
             self._on_url_input_changed(self.active_mode.get())
-        self._save_later()
-
-    def _on_settings_remember_window(self):
-        self._remember_window_size = bool(self.pref_remember_window_var.get())
         self._save_later()
 
     def _on_settings_history_limit(self):
@@ -801,8 +807,7 @@ class App(ctk.CTk):
         for n, b in self.nav_buttons.items():
             b.configure(
                 fg_color=self.palette["panel_soft"] if n == page else "transparent",
-                text_color="#E6EEFF" if n == page else self.palette["text_muted"],
-                border_width=1 if n == page else 0,
+                text_color="#FFFFFF" if n == page else self.palette["text_muted"], border_width=1 if n == page else 0,
                 border_color=self.palette["accent"] if n == page else self.palette["panel_soft"],
             )
         self._save_later()
@@ -1059,7 +1064,6 @@ class App(ctk.CTk):
             self.settings_history_limit_menu.configure(height=30 if compact else 32)
             self.settings_show_logs_switch.configure(font=self.fonts["body_sm"])
             self.settings_auto_analyze.configure(font=self.fonts["body_sm"])
-            self.settings_remember_window.configure(font=self.fonts["body_sm"])
         for button in self.history_folder_buttons:
             button.configure(width=88 if compact else 96, height=26 if compact else 28)
 
@@ -1124,8 +1128,7 @@ class App(ctk.CTk):
                 "playlist_format": st["playlist_format"].get(),
                 "playlist_max": st["playlist_max"].get(),
             }
-        self._remember_window_size = bool(self.pref_remember_window_var.get())
-        geometry = self.geometry() if self._remember_window_size else "1180x780"
+        geometry = f"{self.min_window_width}x{self.min_window_height}"
         settings_payload = {
             "window_geometry": geometry,
             "active_page": self.active_page.get(),
@@ -1136,12 +1139,7 @@ class App(ctk.CTk):
         self.storage.save_settings(settings_payload)
 
     def _apply_saved(self):
-        if self._remember_window_size:
-            g = self.settings.get("window_geometry")
-        else:
-            g = None
-        if g:
-            self.geometry(g)
+        self.geometry(f"{self.min_window_width}x{self.min_window_height}")
         for mode in self.modes:
             saved = self.settings.get("tabs", {}).get(mode, {})
             if isinstance(saved, dict):
@@ -1279,11 +1277,21 @@ class App(ctk.CTk):
                 self._refresh_current()
         self.after(0, ui)
 
-    def _on_progress(self, percent, line, playlist_idx=1):
+    def _on_progress(self, percent, line, playlist_idx=1, status_text=None):
         def ui():
-            self.prog_bar.set(percent / 100.0)
-            self.prog_pct.configure(text=f"{percent:.1f}%")
-            self.current_progress.set(percent / 100.0)
+            if status_text:
+                self.prog_title.configure(text=status_text)
+                self.footer_left.configure(text=status_text.replace("...", ""))
+                if "Merging" in status_text or "Extracting" in status_text or "Converting" in status_text:
+                    self.prog_bar.set(1.0)
+                    self.prog_pct.configure(text="Processing...")
+            else:
+                self.prog_bar.set(percent / 100.0)
+                self.prog_pct.configure(text=f"{percent:.1f}%")
+                self.current_progress.set(percent / 100.0)
+                self.prog_title.configure(text="Downloading...")
+                self.footer_left.configure(text="Downloading...")
+
             sm = re.search(r'at\s+([\d\.]+(?:KiB|MiB|GiB)/s)', line)
             if sm:
                 self.prog_speed.configure(text=sm.group(1))
@@ -1321,14 +1329,14 @@ class App(ctk.CTk):
             self.current_title.configure(text="No active download.")
             self.current_meta.configure(text="")
             self.current_progress.set(0)
-            self.current_badge.configure(text="IDLE", fg_color="#1D3565")
+            self.current_badge.configure(text="IDLE", fg_color=self.palette["panel_soft"])
             self._refresh_queue_preview()
             return
         pd = self.current_job.get("probe_data") or {}
         title = pd.get("title") or self.current_job.get("url")
         self.current_title.configure(text=f"{self.current_job.get('category')}: {title}")
         self.current_meta.configure(text=f"Output: {self.current_job.get('last_destination') or self.current_job.get('output_dir')}")
-        self.current_badge.configure(text="ACTIVE", fg_color="#2450A0")
+        self.current_badge.configure(text="ACTIVE", fg_color=self.palette["accent"])
         self._refresh_queue_preview()
 
     def _refresh_queue_preview(self):
@@ -1345,32 +1353,32 @@ class App(ctk.CTk):
 
         row_idx = 0
         if self.current_job:
-            active = ctk.CTkFrame(self.queue_preview, fg_color=self.palette["panel_alt"], corner_radius=8)
+            active = ctk.CTkFrame(self.queue_preview, fg_color=self.palette["panel_alt"], corner_radius=6)
             active.grid(row=row_idx, column=0, padx=row_pad_x, pady=row_pad_y, sticky="ew")
             active.grid_columnconfigure(0, weight=1)
             pd = self.current_job.get("probe_data") or {}
             title = pd.get("title") or self.current_job.get("url") or "Current download"
-            ctk.CTkLabel(active, text=title, anchor="w", text_color="#EAF2FF", font=self.fonts["body_sm"]).grid(row=0, column=0, padx=row_text_pad_x, pady=(row_text_pad_top, 2), sticky="ew")
-            ctk.CTkLabel(active, text="Downloading now", anchor="w", text_color="#6EA8FF", font=self.fonts["meta"]).grid(row=0, column=1, padx=(0, row_text_pad_x), pady=(row_text_pad_top, 2), sticky="e")
-            ctk.CTkLabel(active, text=self.current_job.get("output_dir", ""), anchor="w", text_color=self.palette["text_muted"], font=self.fonts["meta"]).grid(row=1, column=0, columnspan=2, padx=row_text_pad_x, pady=(0, row_text_pad_top), sticky="ew")
+            ctk.CTkLabel(active, text=title, anchor="w", text_color="#FFFFFF", font=self.fonts["body_sm"]).grid(row=0, column=0, padx=row_text_pad_x, pady=(row_text_pad_top, 2), sticky="ew")
+            ctk.CTkLabel(active, text="Downloading now", anchor="w", text_color="#FFFFFF", font=self.fonts["meta"]).grid(row=0, column=1, padx=(0, row_text_pad_x), pady=(row_text_pad_top, 2), sticky="e")
+            ctk.CTkLabel(active, text=self.current_job.get("output_dir", ""), anchor="w", text_color="#9E9E9E", font=self.fonts["meta"]).grid(row=1, column=0, columnspan=2, padx=row_text_pad_x, pady=(0, row_text_pad_top), sticky="ew")
             self.queue_preview_rows.append(active)
             row_idx += 1
 
         for entry in self.history_entries[:4]:
-            row = ctk.CTkFrame(self.queue_preview, fg_color=self.palette["panel_alt"], corner_radius=8)
+            row = ctk.CTkFrame(self.queue_preview, fg_color=self.palette["panel_alt"], corner_radius=6)
             row.grid(row=row_idx, column=0, padx=row_pad_x, pady=(0, row_pad_y[1]), sticky="ew")
             row.grid_columnconfigure(0, weight=1)
             status = entry.get("status", "unknown").upper()
             status_color = "#2EB67D" if status == "COMPLETED" else "#D5A847" if status == "CANCELLED" else "#D45E5E"
             title = entry.get("title") or entry.get("url") or "Unknown item"
-            ctk.CTkLabel(row, text=title, anchor="w", text_color="#EAF2FF", font=self.fonts["body_sm"]).grid(row=0, column=0, padx=row_text_pad_x, pady=(row_text_pad_top, 2), sticky="ew")
+            ctk.CTkLabel(row, text=title, anchor="w", text_color="#FFFFFF", font=self.fonts["body_sm"]).grid(row=0, column=0, padx=row_text_pad_x, pady=(row_text_pad_top, 2), sticky="ew")
             ctk.CTkLabel(row, text=status, text_color=status_color, font=self.fonts["meta"]).grid(row=0, column=1, padx=(0, row_text_pad_x), pady=(row_text_pad_top, 2), sticky="e")
-            ctk.CTkLabel(row, text=f"{entry.get('category', 'Unknown')} | {entry.get('timestamp', 'Unknown')}", anchor="w", text_color=self.palette["text_muted"], font=self.fonts["meta"]).grid(row=1, column=0, columnspan=2, padx=row_text_pad_x, pady=(0, row_text_pad_top), sticky="ew")
+            ctk.CTkLabel(row, text=f"{entry.get('category', 'Unknown')} | {entry.get('timestamp', 'Unknown')}", anchor="w", text_color="#9E9E9E", font=self.fonts["meta"]).grid(row=1, column=0, columnspan=2, padx=row_text_pad_x, pady=(0, row_text_pad_top), sticky="ew")
             self.queue_preview_rows.append(row)
             row_idx += 1
 
         if row_idx == 0:
-            empty = ctk.CTkLabel(self.queue_preview, text="No recent activity.", text_color=self.palette["text_muted"], anchor="w", font=self.fonts["body_sm"])
+            empty = ctk.CTkLabel(self.queue_preview, text="No recent activity.", text_color="#9E9E9E", anchor="w", font=self.fonts["body_sm"])
             empty.grid(row=0, column=0, padx=row_text_pad_x, pady=row_text_pad_x, sticky="ew")
             self.queue_preview_rows.append(empty)
         else:
@@ -1388,7 +1396,7 @@ class App(ctk.CTk):
         folder_btn_w = 88 if compact else 96
         folder_btn_h = 26 if compact else 28
         if not self.history_entries:
-            r = ctk.CTkLabel(self.history_list, text="No download history yet.", text_color=self.palette["text_muted"], anchor="w", font=self.fonts["body_sm"])
+            r = ctk.CTkLabel(self.history_list, text="No download history yet.", text_color="#9E9E9E", anchor="w", font=self.fonts["body_sm"])
             r.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
             self.history_rows.append(r)
             self.stats_completed.configure(text="Completed: 0")
@@ -1406,14 +1414,14 @@ class App(ctk.CTk):
         except Exception:
             limit = 30
         for i, e in enumerate(self.history_entries[:limit]):
-            row = ctk.CTkFrame(self.history_list, fg_color=self.palette["panel_alt"], corner_radius=8)
+            row = ctk.CTkFrame(self.history_list, fg_color=self.palette["panel_alt"], corner_radius=6)
             row.grid(row=i, column=0, padx=row_pad_x, pady=row_pad_y, sticky="ew")
             row.grid_columnconfigure(0, weight=1)
             status = e.get("status", "unknown").upper()
             title = e.get("title") or e.get("url") or "Unknown item"
             status_color = "#2EB67D" if status == "COMPLETED" else "#D5A847" if status == "CANCELLED" else "#D45E5E"
-            ctk.CTkLabel(row, text=title, anchor="w", text_color="#EAF2FF", font=self.fonts["body"]).grid(row=0, column=0, padx=10, pady=(8, 2), sticky="ew")
-            ctk.CTkLabel(row, text=f"{e.get('timestamp', 'Unknown')} | {e.get('category', 'Unknown')}", anchor="w", text_color=self.palette["text_muted"], font=self.fonts["meta"]).grid(row=1, column=0, padx=10, pady=(0, 8), sticky="ew")
+            ctk.CTkLabel(row, text=title, anchor="w", text_color="#FFFFFF", font=self.fonts["body"]).grid(row=0, column=0, padx=10, pady=(8, 2), sticky="ew")
+            ctk.CTkLabel(row, text=f"{e.get('timestamp', 'Unknown')} | {e.get('category', 'Unknown')}", anchor="w", text_color="#9E9E9E", font=self.fonts["meta"]).grid(row=1, column=0, padx=10, pady=(0, 8), sticky="ew")
             ctk.CTkLabel(row, text=status, text_color=status_color, font=self.fonts["meta"]).grid(row=0, column=1, padx=(0, 8), pady=(8, 2), sticky="e")
             folder = e.get("output_dir") or e.get("destination")
             folder_btn = ctk.CTkButton(
@@ -1422,9 +1430,7 @@ class App(ctk.CTk):
                 width=folder_btn_w,
                 height=folder_btn_h,
                 fg_color=self.palette["panel_soft"],
-                hover_color="#1B325E",
-                border_width=1,
-                border_color=self.palette["line"],
+                hover_color=self.palette["panel_alt"], border_width=1, border_color=self.palette["line"],
                 font=self.fonts["meta"],
                 command=lambda p=folder: self._open_folder(p),
             )

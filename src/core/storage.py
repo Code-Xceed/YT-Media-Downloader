@@ -6,7 +6,7 @@ from core.runtime import resolve_data_dir
 
 
 DEFAULT_SETTINGS = {
-    "window_geometry": "1180x780",
+    "window_geometry": "760x560",
     "active_page": "Downloader",
     "active_mode": "Video",
     "active_tab": "Video",
@@ -18,7 +18,7 @@ DEFAULT_SETTINGS = {
         "auto_analyze": False,
         "history_limit": 30,
         "default_output_dir": "",
-        "remember_window_size": True,
+        "remember_window_size": False,
     },
     "tabs": {},
 }

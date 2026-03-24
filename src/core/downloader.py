@@ -129,6 +129,21 @@ class Downloader:
                     percent = float(match.group(1))
                     if self.on_progress:
                         self.on_progress(percent, line, playlist_idx=current_item)
+                else:
+                    status_text = None
+                    if "[Merger] Merging formats into" in line:
+                        status_text = "Merging Audio and Video..."
+                    elif "[ExtractAudio]" in line:
+                        status_text = "Extracting Audio..."
+                    elif "[FixupM4a]" in line:
+                        status_text = "Optimizing M4A metadata..."
+                    elif "[download] Destination:" in line:
+                        status_text = "Initiating Download..."
+                    elif "[ffmpeg]" in line and "Converting" in line:
+                        status_text = "Converting file format..."
+                    
+                    if status_text and self.on_progress:
+                        self.on_progress(100.0, line, playlist_idx=current_item, status_text=status_text)
 
             self._process.wait()
             
