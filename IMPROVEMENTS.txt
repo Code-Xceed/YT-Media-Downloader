@@ -1,0 +1,42 @@
+[x] Add URL preflight analysis before download.
+[x] Show a preview card with thumbnail, title, uploader, duration, playlist count, and media hints.
+[ ] Replace the tab-heavy workflow with a cleaner sidebar-based layout.
+[x] Persist settings and download history properly.
+[ ] Add a multi-item download queue with reorder and retry support.
+[ ] Make the app self-contained instead of depending on untracked local binaries.
+[ ] Replace the raw log toggle with a cleaner advanced drawer.
+[ ] Show richer progress details: current item, total items, size, speed, ETA, and phase.
+[ ] Improve visual hierarchy, spacing, typography, and empty/loading/error states.
+[ ] Add completion actions such as Open File, Open Folder, and Copy Path.
+[ ] Add inline validation and smarter defaults based on the pasted URL.
+[ ] Add drag-and-drop support for URLs and files.
+[ ] Detect clipboard URLs and offer to auto-fill them.
+[ ] Add a real format picker based on actual available formats.
+[ ] Add audio format options such as mp3, m4a, opus, and wav.
+[ ] Add subtitle language selection instead of hardcoded subtitle flags.
+[ ] Add metadata embedding options for title, artist, upload date, and cover art.
+[ ] Add optional SponsorBlock support.
+[ ] Add chapter download and split-by-chapters support.
+[ ] Add browser cookie import support for restricted content.
+[ ] Add update checks for yt-dlp and ffmpeg.
+[ ] Add retry policies and resume flows for failed downloads.
+[ ] Stop relying on fragile generic stdout parsing where structured progress is available.
+[ ] Separate the backend into dedicated services for download management, probing, models, and storage.
+[ ] Introduce an explicit job state machine: idle, probing, queued, downloading, processing, completed, failed, cancelled.
+[ ] Improve cancellation handling for queued and active jobs.
+[ ] Add structured error reporting with user-friendly failure reasons.
+[ ] Validate dependencies on startup and show environment health clearly.
+[ ] Add persistent log files with rotation.
+[ ] Package the app properly with PyInstaller or Nuitka.
+[ ] Build both installer and portable distribution variants.
+[ ] Add automated tests for command generation, probing, and cancellation behavior.
+[ ] Restore and improve the README and setup documentation.
+[ ] Clean the repo by removing stale artifacts and documenting bootstrap requirements.
+[ ] Add CI for linting, type-checking, and tests.
+
+Implementation order:
+1. URL preflight analysis + preview card
+2. Persistent settings + history
+3. Download manager refactor + queue support
+4. Main window redesign
+5. Packaging + distribution cleanup

@@ -2,7 +2,8 @@ import subprocess
 import threading
 import re
 import os
-import sys
+
+from core.runtime import build_startupinfo, resolve_tool_paths
 
 class Downloader:
     def __init__(self, on_progress=None, on_log=None, on_complete=None):
@@ -13,15 +14,7 @@ class Downloader:
         self.is_running = False
         self.is_cancelled = False
         self._process = None
-        
-        if getattr(sys, 'frozen', False):
-            base_path = sys._MEIPASS
-            self.ytdlp_path = os.path.join(base_path, "bin", "yt-dlp.exe")
-            self.ffmpeg_path = os.path.join(base_path, "bin", "ffmpeg", "bin")
-        else:
-            base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            self.ytdlp_path = os.path.join(base_path, "bin", "yt-dlp.exe")
-            self.ffmpeg_path = os.path.join(base_path, "bin", "ffmpeg", "bin")
+        self.ytdlp_path, self.ffmpeg_path = resolve_tool_paths()
 
     def _log(self, msg):
         if self.on_log:
@@ -106,10 +99,6 @@ class Downloader:
 
     def _run_subprocess(self, cmd, output_dir):
         try:
-            startupinfo = subprocess.STARTUPINFO()
-            if os.name == 'nt':
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                
             self._process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
@@ -117,7 +106,7 @@ class Downloader:
                 text=True,
                 bufsize=1,
                 universal_newlines=True,
-                startupinfo=startupinfo
+                startupinfo=build_startupinfo()
             )
             
             progress_regex = re.compile(r'\[download\]\s+([\d\.]+)%')
